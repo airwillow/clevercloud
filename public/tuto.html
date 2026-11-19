@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Tutoriel Brique à Brique</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  /* Layout : mur jouable à gauche, mission en cours à droite, règles en dessous. Look unique « chantier de nuit ». */
+  :root {
+    --bg: #0d1222;
+    --panel: #161f39;
+    --line: #24304f;
+    --text: #eef1f8;
+    --muted: #9aa5c2;
+    --yellow: #f2cd37;
+    --good: #3ccf6e;
+    --bad: #ff6b5a;
+    --plate: #1a2133;
+    --display: Fredoka, "Trebuchet MS", system-ui, sans-serif;
+    --body: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body {
+    background: radial-gradient(900px 500px at 0% -10%, #1d2a55 0%, transparent 60%), var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 15px;
+    padding-block: 20px 32px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible, a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  kbd { background: #0004; border: 1px solid #fff3; border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; font-size: .85em; }
+  .wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 20px; }
+
+  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .logo { width: 46px; height: 30px; background: #C91A09; border-radius: 6px; position: relative; transform: rotate(-6deg); box-shadow: inset 0 -5px 0 #0004; flex: none; }
+  .logo::before, .logo::after { content: ""; position: absolute; top: -6px; width: 12px; height: 7px; background: #C91A09; border-radius: 4px 4px 0 0; }
+  .logo::before { left: 8px; } .logo::after { right: 8px; }
+  header h1 { font-size: 1.6rem; line-height: 1.1; }
+  header p { margin: 2px 0 0; color: var(--muted); }
+  .play-link { color: #2d2300; background: var(--yellow); padding: 9px 14px; border-radius: 10px; font-family: var(--display); font-weight: 600; text-decoration: none; box-shadow: inset 0 -3px 0 #0003; }
+
+  .game { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .game { grid-template-columns: minmax(0, 1fr); } .side { order: -1; } .feed-panel { display: none; } }
+
+  .board { display: grid; gap: 10px; min-width: 0; }
+  .wall-wrap { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--plate); box-shadow: 0 20px 50px #0007; }
+  #wall { display: block; width: 100%; height: auto; touch-action: manipulation; cursor: crosshair; }
+  .hover-info { color: var(--muted); font-size: .85rem; min-height: 1.3em; }
+  .toolbar { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; justify-content: space-between; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+  .palette { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatch { position: relative; width: 38px; height: 30px; border: 0; padding: 0; border-radius: 6px; box-shadow: inset 0 -4px 0 #0005, inset 0 2px 0 #fff3; }
+  .swatch::after { content: ""; position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; transform: translate(-50%, -60%); border-radius: 50%; background: inherit; box-shadow: 0 2px 2px #0006, inset 0 2px 1px #fff5; }
+  .swatch.active { outline: 3px solid var(--text); outline-offset: 2px; transform: translateY(-3px); }
+  .swatch .k { position: absolute; right: 3px; bottom: 0; font-size: .6rem; font-weight: 600; color: #000; opacity: .65; }
+  .reserve { flex: 0 1 220px; min-width: 170px; }
+  .reserve-label { display: flex; justify-content: space-between; font-size: .8rem; color: var(--muted); margin-bottom: 5px; font-variant-numeric: tabular-nums; }
+  .reserve-label b { color: var(--text); }
+  .reserve-bar { display: flex; gap: 4px; }
+  .reserve-bar i { flex: 1; height: 14px; border-radius: 3px; background: #2a3555; position: relative; overflow: hidden; }
+  .reserve-bar i.full { background: var(--yellow); box-shadow: inset 0 -3px 0 #0003; }
+  .reserve-bar i.charging::after { content: ""; position: absolute; inset: 0; background: #f2cd3788; transform-origin: left; transform: scaleX(var(--p, 0)); }
+  .reserve.flash .reserve-bar i { animation: flash .5s 2; }
+  @keyframes flash { 50% { background: var(--bad); } }
+
+  .side { display: grid; gap: 14px; min-width: 0; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .mission { border-color: #f2cd3766; }
+  .steps { display: flex; gap: 5px; margin-bottom: 12px; }
+  .steps i { flex: 1; height: 6px; border-radius: 3px; background: #2a3555; }
+  .steps i.done { background: var(--good); }
+  .steps i.now { background: var(--yellow); }
+  .eyebrow { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--yellow); font-weight: 600; }
+  .mission h2 { font-size: 1.35rem; margin: 4px 0 8px; }
+  .mission p { margin: 0 0 10px; line-height: 1.5; color: #d5dbea; }
+  .result { border-radius: 10px; padding: 10px 12px; font-size: .92rem; line-height: 1.45; margin-bottom: 10px; }
+  .result.ok { background: #3ccf6e1f; border: 1px solid #3ccf6e66; }
+  .result.info { background: #ff6b5a1a; border: 1px solid #ff6b5a55; }
+  .mission-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn { border: 0; border-radius: 10px; padding: 10px 14px; font-family: var(--display); font-weight: 600; font-size: 1rem; }
+  .btn-main { background: var(--yellow); color: #2d2300; box-shadow: inset 0 -3px 0 #0003; }
+  .btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+
+  .scores { display: grid; gap: 6px; }
+  .scores h3, .feed-panel h3 { font-size: 1rem; margin-bottom: 8px; }
+  .score-row { display: flex; justify-content: space-between; font-size: .92rem; font-variant-numeric: tabular-nums; }
+  .score-row.me b:first-child { color: var(--yellow); }
+  .progress { height: 10px; background: #2a3555; border-radius: 999px; overflow: hidden; margin: 6px 0 4px; }
+  .progress div { height: 100%; width: 0; background: linear-gradient(90deg, var(--yellow), #ff9f1a); transition: width .3s; border-radius: 999px; }
+  .progress-text { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .feed { list-style: none; margin: 0; padding: 0; font-size: .85rem; display: grid; gap: 4px; max-height: 150px; overflow: hidden; }
+  .feed li { display: flex; gap: 8px; align-items: center; }
+  .feed .sw { width: 14px; height: 10px; border-radius: 2px; flex: none; }
+  .feed .muted { color: var(--muted); }
+
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .rules { grid-template-columns: 1fr; } }
+  .rules h2 { font-size: 1.15rem; margin-bottom: 10px; }
+  .rules ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+  .rules li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; line-height: 1.45; }
+  .rules .can { border-top: 3px solid var(--good); }
+  .rules .cannot { border-top: 3px solid var(--bad); }
+  .rules .wide { grid-column: 1 / -1; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  .fact b { display: block; font-family: var(--display); font-size: 1.05rem; margin-bottom: 2px; }
+  .fact span { color: var(--muted); font-size: .9rem; line-height: 1.45; }
+
+  .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px); opacity: 0; pointer-events: none; background: #1f2944; border: 1px solid #ffffff22; padding: 10px 16px; border-radius: 12px; font-size: .9rem; transition: .2s; z-index: 60; max-width: calc(100% - 32px); text-align: center; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast.bad { border-color: #ff6b5a99; }
+
+  .celebrate { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: #05081299; padding: 16px; }
+  #confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .celebrate-card { position: relative; background: #121a30; border: 2px solid var(--yellow); border-radius: 22px; padding: 26px; max-width: 440px; width: 100%; text-align: center; animation: pop .4s cubic-bezier(.2, 1.6, .4, 1); }
+  @keyframes pop { from { transform: scale(.6); opacity: 0; } }
+  .celebrate-card h2 { font-size: 1.7rem; margin: 6px 0 10px; }
+  .celebrate-card p { color: #d5dbea; line-height: 1.5; margin: 0 0 12px; }
+  .celebrate-card .mission-actions { justify-content: center; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Brique à Brique · Tutoriel</h1>
+        <p>Apprenez les règles en jouant, en 2 minutes. Ici, tout se passe sur votre écran.</p>
+      </div>
+    </div>
+    <a class="play-link" id="playLink" href="/" hidden>Jouer pour de vrai →</a>
+  </header>
+
+  <section class="game">
+    <div class="board">
+      <div class="wall-wrap"><canvas id="wall" aria-label="Mur d'entraînement"></canvas></div>
+      <div class="hover-info" id="hoverInfo">Survolez le mur pour voir les infos de chaque case.</div>
+      <div class="toolbar">
+        <div class="palette" id="palette" role="radiogroup" aria-label="Couleur de brique"></div>
+        <div class="reserve" id="reserve">
+          <div class="reserve-label"><span>Réserve de briques</span><b id="tokenText">6/6</b></div>
+          <div class="reserve-bar" id="reserveBar"></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="panel mission" aria-live="polite">
+        <div class="steps" id="steps"></div>
+        <div class="eyebrow" id="stepNo">Étape 1</div>
+        <h2 id="stepTitle">…</h2>
+        <p id="stepText">…</p>
+        <div class="result" id="stepResult" hidden></div>
+        <div class="mission-actions">
+          <button class="btn btn-main" id="nextBtn" hidden>Étape suivante →</button>
+          <button class="btn btn-ghost" id="skipBtn">Passer l'étape</button>
+        </div>
+      </div>
+
+      <div class="panel scores">
+        <h3>Notice : la petite maison</h3>
+        <div class="progress"><div id="progressFill"></div></div>
+        <div class="progress-text" id="progressText">0 / 48 briques conformes</div>
+        <div id="scoreRows"></div>
+      </div>
+
+      <div class="panel feed-panel">
+        <h3>Ce qui se passe</h3>
+        <ul class="feed" id="feed"><li class="muted">Le chantier est calme…</li></ul>
+      </div>
+    </aside>
+  </section>
+
+  <section class="rules" aria-label="Récapitulatif des règles">
+    <div class="panel can">
+      <h2>✅ Vous pouvez</h2>
+      <ul>
+        <li><span>🧱</span><span>Poser une brique <b>sur le sol</b> ou <b>sur une autre brique</b>.</span></li>
+        <li><span>🎨</span><span><b>Remplacer</b> une brique par une autre couleur, la vôtre comme celle des autres.</span></li>
+        <li><span>🛠️</span><span><b>Corriger</b> une brique de la mauvaise couleur dans la notice.</span></li>
+        <li><span>🏗️</span><span>Construire <b>librement</b> en dehors des pointillés.</span></li>
+        <li><span>💧</span><span>Prendre la couleur de la notice avec la <b>pipette</b> : clic droit, ou appui long sur mobile.</span></li>
+      </ul>
+    </div>
+    <div class="panel cannot">
+      <h2>❌ Vous ne pouvez pas</h2>
+      <ul>
+        <li><span>🪂</span><span>Poser une brique <b>dans le vide</b> : la gravité l'interdit.</span></li>
+        <li><span>🗑️</span><span><b>Retirer</b> une brique. On peut seulement la remplacer.</span></li>
+        <li><span>🔒</span><span>Toucher à une brique <b>déjà conforme</b> à la notice : elle est verrouillée.</span></li>
+        <li><span>⏱️</span><span>Poser plus vite que votre <b>réserve</b> : 10 briques, +1 par seconde dans le vrai jeu.</span></li>
+        <li><span>♻️</span><span>Reposer la <b>même couleur</b> sur une brique identique.</span></li>
+      </ul>
+    </div>
+    <div class="panel wide">
+      <div class="facts">
+        <div class="fact"><b>+1 point</b><span>par brique posée à la bonne couleur dans la notice. Pas de point hors notice, pas de points négatifs.</span></div>
+        <div class="fact"><b>Tout le monde ensemble</b><span>Dans le vrai jeu, tous les visiteurs partagent le même mur et voient chaque brique en direct.</span></div>
+        <div class="fact"><b>Modèle terminé à 100 %</b><span>Il part dans la galerie avec le podium. Le mur est vidé et une nouvelle notice démarre 10 s plus tard.</span></div>
+        <div class="fact"><b>Classement</b><span>Les points s'additionnent d'une plaque à l'autre. Les meilleurs bâtisseurs restent en tête.</span></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="celebrate" id="celebrate" hidden>
+  <canvas id="confetti"></canvas>
+  <div class="celebrate-card">
+    <div style="font-size:3rem" aria-hidden="true">🎉</div>
+    <h2>Maison terminée !</h2>
+    <p id="finalText"></p>
+    <p>Dans le vrai jeu, le modèle rejoint la <b>galerie</b> avec son podium, puis une <b>nouvelle plaque</b> commence avec la notice suivante.</p>
+    <div class="mission-actions">
+      <button class="btn btn-main" id="replayBtn">Rejouer le tutoriel</button>
+      <a class="btn btn-ghost play-link-2" id="playLink2" href="/" hidden style="text-decoration:none">Jouer pour de vrai →</a>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const IN_APP = /\/tuto(\.html)?$/.test(location.pathname);
+  if (IN_APP) { $('playLink').hidden = false; $('playLink2').hidden = false; }
+
+  // ---------- Données ----------
+  const PALETTE = [
+    null,
+    { key: 'W', name: 'Blanc', hex: '#F4F4F4' },
+    { key: 'R', name: 'Rouge', hex: '#C91A09' },
+    { key: 'A', name: 'Azur', hex: '#36AEBF' },
+    { key: 'Y', name: 'Jaune', hex: '#F2CD37' },
+    { key: 'D', name: 'Gris foncé', hex: '#5B5D58' },
+    { key: 'G', name: 'Vert', hex: '#237841' },
+    { key: 'B', name: 'Bleu', hex: '#0055BF' },
+    { key: 'O', name: 'Orange', hex: '#FE8A18' },
+  ];
+  const KEY = Object.fromEntries(PALETTE.map((p, i) => p && [p.key, i]).filter(Boolean));
+  const BP_ROWS = [
+    'AAARRAAA',
+    'AARRRRAA',
+    'ARRRRRRA',
+    'AWYWWYWA',
+    'AWWWDWWA',
+    'GGGGGGGG',
+  ];
+  const W = 14, H = 9, CELL = 34;
+  const BP = { w: 8, h: 6, x0: 3, y0: 3, data: BP_ROWS.join('').split('').map((k) => KEY[k]) };
+  const TOTAL = BP.w * BP.h;
+  const MAX_TOKENS = 6, REGEN = 1500;
+
+  // ---------- État ----------
+  let grid, owners, scores, tokens, selected = 6, hover = null, step = 0, stepDone = false, completed = false, bots = null;
+  function reset() {
+    grid = new Array(W * H).fill(0);
+    owners = new Array(W * H).fill(null);
+    scores = { Vous: 0, Alice: 0, Bob: 0 };
+    tokens = { n: MAX_TOKENS, last: Date.now() };
+    completed = false;
+    clearInterval(bots); bots = null;
+    $('feed').innerHTML = '<li class="muted">Le chantier est calme…</li>';
+  }
+
+  const expectedAt = (x, y) => {
+    const bx = x - BP.x0, by = y - BP.y0;
+    if (bx < 0 || by < 0 || bx >= BP.w || by >= BP.h) return 0;
+    return BP.data[by * BP.w + bx];
+  };
+  const progress = () => {
+    let n = 0;
+    for (let y = 0; y < BP.h; y++) for (let x = 0; x < BP.w; x++) if (grid[(BP.y0 + y) * W + BP.x0 + x] === BP.data[y * BP.w + x]) n++;
+    return n;
+  };
+  function regen() {
+    const now = Date.now();
+    if (tokens.n >= MAX_TOKENS) { tokens.last = now; return; }
+    const k = Math.floor((now - tokens.last) / REGEN);
+    if (k > 0) { tokens.n = Math.min(MAX_TOKENS, tokens.n + k); tokens.last += k * REGEN; }
+  }
+
+  // Les mêmes règles que le vrai serveur
+  function check(x, y, c, isBot) {
+    const i = y * W + x, cur = grid[i], exp = expectedAt(x, y);
+    if (completed) return 'done';
+    if (cur === c) return 'same';
+    if (cur === 0 && y < H - 1 && grid[i + W] === 0) return 'gravity';
+    if (exp && cur === exp) return 'locked';
+    if (!isBot) { regen(); if (tokens.n <= 0) return 'tokens'; }
+    return 'ok';
+  }
+  const REASONS = {
+    same: 'Cette brique est déjà de cette couleur.',
+    gravity: 'Gravité ! Une brique doit reposer sur le sol ou sur une autre brique.',
+    locked: 'Brique conforme à la notice : elle est verrouillée 🔒',
+    tokens: 'Réserve vide ! Attendez qu\'elle se recharge.',
+    done: 'Modèle terminé !',
+  };
+
+  function place(who, x, y, c) {
+    const isBot = who !== 'Vous';
+    const r = check(x, y, c, isBot);
+    if (r !== 'ok') return { ok: false, reason: r };
+    const i = y * W + x, prev = grid[i], exp = expectedAt(x, y);
+    if (!isBot) { if (tokens.n === MAX_TOKENS) tokens.last = Date.now(); tokens.n--; }
+    grid[i] = c; owners[i] = who; anims.set(i, performance.now());
+    const good = !!exp && c === exp;
+    if (good) scores[who]++;
+    if (isBot) addFeed(`<b>${who}</b> ${good ? '<span style="color:var(--good)">✓ notice +1</span>' : exp ? '<span style="color:var(--bad)">✗ mauvaise couleur</span>' : 'construit hors notice'}`, PALETTE[c].hex);
+    renderStats();
+    if (progress() === TOTAL) setTimeout(finish, 350);
+    return { ok: true, good, inBp: !!exp, prevWrong: !!exp && prev !== 0 && prev !== exp };
+  }
+
+  // ---------- Étapes ----------
+  const STEPS = [
+    { title: 'Posez votre première brique',
+      text: 'Choisissez une couleur en bas, puis cliquez sur la <b>rangée du bas</b> du mur : c\'est le sol.',
+      hint: () => ({ x: 0, y: H - 1, w: W, h: 1 }),
+      test: (e) => e.ok,
+      win: 'Bravo ! Vous voyez votre pseudo en survolant la brique. Dans le vrai jeu, tout le monde la voit apparaître en direct.' },
+    { title: 'La gravité',
+      text: 'Essayez maintenant de poser une brique <b>dans le vide</b>, tout en haut du mur.',
+      hint: () => ({ x: 0, y: 0, w: W, h: 2 }),
+      test: (e) => !e.ok && e.reason === 'gravity',
+      win: 'Refusé ! Une brique doit toujours reposer <b>sur le sol ou sur une autre brique</b>. On construit donc du bas vers le haut, comme en vrai.' },
+    { title: 'Suivez la notice',
+      text: 'La zone en <b>pointillés jaunes</b> est la notice : les briques transparentes montrent la couleur attendue. Posez une brique <b>verte</b> (touche <kbd>6</kbd>) sur sa rangée du bas.',
+      hint: () => ({ x: BP.x0, y: BP.y0 + BP.h - 1, w: BP.w, h: 1 }),
+      onEnter: () => selectColor(KEY.G),
+      test: (e) => e.ok && e.good,
+      win: '<b>+1 point !</b> La brique est conforme à la notice. Elle est maintenant <b>verrouillée</b>.' },
+    { title: 'Le verrou',
+      text: 'Essayez de <b>changer la couleur</b> d\'une brique verte que vous venez de poser correctement.',
+      hint: () => ({ x: BP.x0, y: BP.y0 + BP.h - 1, w: BP.w, h: 1 }),
+      onEnter: () => selectColor(KEY.R),
+      test: (e) => !e.ok && e.reason === 'locked',
+      win: 'Impossible : une brique conforme ne peut plus être modifiée par personne. C\'est la protection <b>anti-vandalisme</b>.' },
+    { title: 'Le droit à l\'erreur',
+      text: 'Posez volontairement une <b>mauvaise couleur</b> dans la notice, par exemple du bleu (touche <kbd>7</kbd>) sur la rangée du bas.',
+      hint: () => ({ x: BP.x0, y: BP.y0 + BP.h - 2, w: BP.w, h: 2 }),
+      onEnter: () => selectColor(KEY.B),
+      test: (e) => e.ok && e.inBp && !e.good,
+      win: 'Pas de point, mais pas de pénalité. Un <b>petit coin</b> de la bonne couleur apparaît sur la brique fausse.' },
+    { title: 'Corrigez l\'erreur',
+      text: 'Faites un <b>clic droit</b> (ou un appui long) sur la brique fausse : la pipette prend la bonne couleur. Cliquez ensuite dessus pour la remplacer.',
+      hint: () => null,
+      test: (e) => e.ok && e.good && e.prevWrong,
+      win: 'Corrigé, <b>+1 point</b> ! On ne retire jamais une brique : on la <b>remplace</b> par une autre couleur.' },
+    { title: 'La zone libre',
+      text: 'En dehors des pointillés, c\'est la <b>zone libre</b>. Posez une brique où vous voulez, à gauche ou à droite de la notice.',
+      hint: () => ({ x: 0, y: 0, w: BP.x0, h: H }),
+      test: (e) => e.ok && !e.inBp,
+      win: 'Ici, pas de point mais une totale liberté. Attention : n\'importe qui peut <b>recouvrir</b> vos briques de la zone libre.' },
+    { title: 'La réserve',
+      text: 'Regardez la jauge « Réserve » sous le mur. Posez des briques <b>le plus vite possible</b> jusqu\'à la vider.',
+      hint: () => null,
+      test: (e) => !e.ok && e.reason === 'tokens',
+      win: 'Réserve vide ! Elle se recharge toute seule : ici 1 brique toutes les 1,5 s, et <b>10 briques, +1 par seconde</b> dans le vrai jeu.' },
+    { title: 'Vous n\'êtes pas seul',
+      text: '<b>Alice</b> et <b>Bob</b> rejoignent le chantier. Terminez la maison <b>ensemble</b> ! Leurs erreurs aussi peuvent être corrigées.',
+      hint: () => ({ x: BP.x0, y: BP.y0, w: BP.w, h: BP.h }),
+      onEnter: startBots,
+      test: (e) => e.complete,
+      win: '' },
+  ];
+
+  function renderSteps() {
+    $('steps').innerHTML = STEPS.map((_, k) => `<i class="${k < step || (k === step && stepDone) ? 'done' : k === step ? 'now' : ''}"></i>`).join('');
+  }
+  function enterStep(k) {
+    step = k; stepDone = false;
+    const s = STEPS[k];
+    $('stepNo').textContent = `Étape ${k + 1} sur ${STEPS.length}`;
+    $('stepTitle').textContent = s.title;
+    $('stepText').innerHTML = s.text;
+    $('stepResult').hidden = true;
+    $('nextBtn').hidden = true;
+    $('skipBtn').hidden = false;
+    renderSteps();
+    s.onEnter && s.onEnter();
+  }
+  function event(e) {
+    if (stepDone) return;
+    const s = STEPS[step];
+    if (!s.test(e)) return;
+    stepDone = true;
+    renderSteps();
+    if (s.win) {
+      const r = $('stepResult');
+      r.innerHTML = s.win;
+      r.className = `result ${e.ok ? 'ok' : 'info'}`;
+      r.hidden = false;
+    }
+    $('skipBtn').hidden = true;
+    if (step < STEPS.length - 1) { $('nextBtn').hidden = false; $('nextBtn').focus({ preventScroll: true }); }
+    sfx.step();
+  }
+  $('nextBtn').onclick = () => enterStep(step + 1);
+  $('skipBtn').onclick = () => {
+    if (step === STEPS.length - 1) { fillAll(); return; }
+    enterStep(step + 1);
+  };
+
+  // ---------- Bots ----------
+  function stackTop(x) {
+    for (let y = H - 1; y >= 0; y--) if (grid[y * W + x] === 0) return (y === H - 1 || grid[(y + 1) * W + x] !== 0) ? y : -1;
+    return -1;
+  }
+  function todo() {
+    const list = [];
+    for (let y = 0; y < BP.h; y++) for (let x = 0; x < BP.w; x++) {
+      const gx = BP.x0 + x, gy = BP.y0 + y, exp = BP.data[y * BP.w + x];
+      if (check(gx, gy, exp, true) === 'ok') list.push([gx, gy, exp]);
+    }
+    return list;
+  }
+  let bobMistakes = 0;
+  function botTick() {
+    if (completed) return;
+    const who = Math.random() < 0.5 ? 'Alice' : 'Bob';
+    const r = Math.random();
+    if (r < 0.1) {
+      const xs = [0, 1, 2, 11, 12, 13], x = xs[Math.floor(Math.random() * xs.length)], y = stackTop(x);
+      if (y >= 0) { place(who, x, y, 1 + Math.floor(Math.random() * 8)); return; }
+    }
+    const list = todo();
+    if (!list.length) return;
+    const [x, y, exp] = list[Math.floor(Math.random() * list.length)];
+    if (who === 'Bob' && bobMistakes < 2 && r > 0.85 && grid[y * W + x] === 0) {
+      bobMistakes++;
+      place('Bob', x, y, exp === KEY.O ? KEY.B : KEY.O);
+      return;
+    }
+    place(who, x, y, exp);
+  }
+  function startBots() {
+    bobMistakes = 0;
+    addFeed('👋 <b>Alice</b> et <b>Bob</b> ont rejoint le chantier.');
+    clearInterval(bots);
+    bots = setInterval(botTick, 450);
+  }
+  function fillAll() {
+    for (let y = BP.h - 1; y >= 0; y--) for (let x = 0; x < BP.w; x++) {
+      const i = (BP.y0 + y) * W + BP.x0 + x;
+      if (grid[i] !== BP.data[y * BP.w + x]) { grid[i] = BP.data[y * BP.w + x]; owners[i] = owners[i] || 'Alice'; }
+    }
+    renderStats();
+    finish();
+  }
+  function finish() {
+    if (completed) return;
+    completed = true;
+    clearInterval(bots);
+    if (step === STEPS.length - 1) event({ complete: true });
+    const ranking = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+    $('finalText').innerHTML = `Podium : ${ranking.map(([n, p], k) => `${['🥇', '🥈', '🥉'][k]} <b>${n}</b> (${p})`).join(' · ')}`;
+    $('celebrate').hidden = false;
+    sfx.win();
+    confettiStop = runConfetti();
+  }
+  $('replayBtn').onclick = () => {
+    $('celebrate').hidden = true;
+    confettiStop && confettiStop();
+    reset(); renderStats(); enterStep(0);
+  };
+  $('celebrate').addEventListener('click', (ev) => { if (ev.target.id === 'celebrate') { $('celebrate').hidden = true; confettiStop && confettiStop(); } });
+
+  // ---------- Rendu ----------
+  const canvas = $('wall'), ctx = canvas.getContext('2d');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = W * CELL * dpr; canvas.height = H * CELL * dpr;
+  const anims = new Map();
+  function shade(hex, a) { const n = parseInt(hex.slice(1), 16), f = (v) => Math.max(0, Math.min(255, Math.round(v + a * 255))); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; }
+  function sprite(hex) {
+    const c = document.createElement('canvas'); c.width = c.height = CELL * dpr;
+    const g = c.getContext('2d'); g.scale(dpr, dpr);
+    if (!hex) {
+      g.fillStyle = '#1a2133'; g.fillRect(0, 0, CELL, CELL);
+      g.beginPath(); g.arc(CELL / 2, CELL / 2, CELL * .22, 0, 7); g.fillStyle = '#20293e'; g.fill(); g.strokeStyle = '#26304a'; g.stroke();
+      return c;
+    }
+    g.fillStyle = hex; g.fillRect(.5, .5, CELL - 1, CELL - 1);
+    g.fillStyle = shade(hex, .18); g.fillRect(.5, .5, CELL - 1, 2); g.fillRect(.5, .5, 2, CELL - 1);
+    g.fillStyle = shade(hex, -.22); g.fillRect(.5, CELL - 3.5, CELL - 1, 3); g.fillRect(CELL - 2.5, .5, 2, CELL - 1);
+    const cx = CELL / 2, cy = CELL / 2 - 1, r = CELL * .27;
+    g.beginPath(); g.arc(cx + .5, cy + 2, r, 0, 7); g.fillStyle = shade(hex, -.3); g.fill();
+    g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fillStyle = hex; g.fill();
+    const gr = g.createLinearGradient(cx - r, cy - r, cx + r, cy + r); gr.addColorStop(0, shade(hex, .25)); gr.addColorStop(.6, '#0000');
+    g.beginPath(); g.arc(cx, cy, r - .5, 0, 7); g.fillStyle = gr; g.fill();
+    return c;
+  }
+  const SPR = PALETTE.map((p) => p && sprite(p.hex));
+  const EMPTY = sprite(null);
+
+  function draw(now) {
+    const s = CELL * dpr;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, c = grid[i], exp = expectedAt(x, y);
+      ctx.drawImage(EMPTY, x * s, y * s);
+      if (c) {
+        const t0 = anims.get(i);
+        let dy = 0;
+        if (t0 !== undefined) { const k = Math.min(1, (now - t0) / 220); dy = (1 - (1 - Math.pow(1 - k, 3))) * s * .9; if (k >= 1) anims.delete(i); }
+        ctx.drawImage(SPR[c], x * s, y * s - dy);
+        if (exp && c !== exp) {
+          ctx.fillStyle = PALETTE[exp].hex;
+          ctx.beginPath(); ctx.moveTo(x * s + s, y * s); ctx.lineTo(x * s + s, y * s + s * .45); ctx.lineTo(x * s + s * .55, y * s); ctx.fill();
+        }
+        if (exp && c === exp && hover && hover.x === x && hover.y === y) {
+          ctx.font = `${14 * dpr}px system-ui`; ctx.fillText('🔒', x * s + 2 * dpr, y * s + 15 * dpr);
+        }
+      } else if (exp) {
+        ctx.globalAlpha = .33; ctx.drawImage(SPR[exp], x * s, y * s); ctx.globalAlpha = 1;
+      }
+    }
+    ctx.save(); ctx.setLineDash([6 * dpr, 5 * dpr]); ctx.strokeStyle = '#f2cd37cc'; ctx.lineWidth = 2 * dpr;
+    ctx.strokeRect(BP.x0 * s + dpr, BP.y0 * s + dpr, BP.w * s - 2 * dpr, BP.h * s - 2 * dpr); ctx.restore();
+
+    // Zone conseillée par l'étape en cours
+    const h = !stepDone && !completed && STEPS[step].hint();
+    if (h) {
+      const a = .35 + .3 * Math.sin(now / 250);
+      ctx.fillStyle = `rgba(242, 205, 55, ${a * .25})`;
+      ctx.fillRect(h.x * s, h.y * s, h.w * s, h.h * s);
+      ctx.strokeStyle = `rgba(242, 205, 55, ${a + .2})`; ctx.lineWidth = 3 * dpr;
+      ctx.strokeRect(h.x * s + 1.5 * dpr, h.y * s + 1.5 * dpr, h.w * s - 3 * dpr, h.h * s - 3 * dpr);
+    }
+    if (hover && !completed) {
+      const ok = check(hover.x, hover.y, selected, true) === 'ok';
+      if (ok) { ctx.globalAlpha = .75; ctx.drawImage(SPR[selected], hover.x * s, hover.y * s); ctx.globalAlpha = 1; }
+      ctx.strokeStyle = ok ? '#fff' : '#ff4d3a'; ctx.lineWidth = 2 * dpr;
+      ctx.strokeRect(hover.x * s + dpr, hover.y * s + dpr, s - 2 * dpr, s - 2 * dpr);
+    }
+    requestAnimationFrame(draw);
+  }
+
+  function renderStats() {
+    const n = progress();
+    $('progressFill').style.width = `${(n / TOTAL) * 100}%`;
+    $('progressText').textContent = `${n} / ${TOTAL} briques conformes (${Math.floor((n / TOTAL) * 100)} %)`;
+    $('scoreRows').innerHTML = Object.entries(scores).map(([n2, p]) => `<div class="score-row ${n2 === 'Vous' ? 'me' : ''}"><b>${n2}</b><span>${p} pt${p > 1 ? 's' : ''}</span></div>`).join('');
+  }
+  function renderReserve() {
+    regen();
+    const bar = $('reserveBar');
+    if (bar.children.length !== MAX_TOKENS) bar.innerHTML = '<i></i>'.repeat(MAX_TOKENS);
+    const frac = tokens.n >= MAX_TOKENS ? 0 : (Date.now() - tokens.last) / REGEN;
+    [...bar.children].forEach((el, k) => {
+      el.className = k < tokens.n ? 'full' : k === tokens.n ? 'charging' : '';
+      if (k === tokens.n) el.style.setProperty('--p', frac.toFixed(2));
+    });
+    $('tokenText').textContent = `${tokens.n}/${MAX_TOKENS}`;
+  }
+  setInterval(renderReserve, 100);
+
+  function addFeed(html, color) {
+    const el = $('feed');
+    el.querySelector('.muted')?.remove();
+    const li = document.createElement('li');
+    li.innerHTML = `${color ? `<span class="sw" style="background:${color}"></span>` : ''}<span>${html}</span>`;
+    el.prepend(li);
+    while (el.children.length > 7) el.lastChild.remove();
+  }
+
+  function renderPalette() {
+    $('palette').innerHTML = '';
+    PALETTE.forEach((p, i) => {
+      if (!p) return;
+      const b = document.createElement('button');
+      b.className = 'swatch'; b.style.background = p.hex; b.title = `${p.name} (touche ${i})`;
+      b.setAttribute('role', 'radio'); b.setAttribute('aria-label', p.name); b.dataset.c = i;
+      b.innerHTML = `<span class="k">${i}</span>`;
+      b.onclick = () => selectColor(i);
+      $('palette').appendChild(b);
+    });
+    selectColor(selected);
+  }
+  function selectColor(c) {
+    selected = c;
+    [...$('palette').children].forEach((b) => { const on = Number(b.dataset.c) === c; b.classList.toggle('active', on); b.setAttribute('aria-checked', on); });
+  }
+
+  let toastT;
+  function toast(msg, bad) {
+    const el = $('toast'); el.textContent = msg; el.className = `toast show ${bad ? 'bad' : ''}`;
+    clearTimeout(toastT); toastT = setTimeout(() => (el.className = 'toast'), 2200);
+  }
+
+  // ---------- Sons ----------
+  let actx;
+  function beep(f, d = .06, type = 'square', v = .05, w = 0) {
+    try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); const t = actx.currentTime + w, o = actx.createOscillator(), g = actx.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(g).connect(actx.destination); o.start(t); o.stop(t + d); } catch {}
+  }
+  const sfx = {
+    place: () => { beep(180, .05); beep(90, .06, 'triangle', .08, .01); },
+    good: () => { beep(660, .07, 'triangle', .07); beep(990, .1, 'triangle', .06, .06); },
+    bad: () => beep(110, .12, 'sawtooth', .04),
+    step: () => { beep(523, .1, 'triangle', .05); beep(784, .14, 'triangle', .05, .08); },
+    win: () => [523, 659, 784, 1046, 784, 1046].forEach((f, k) => beep(f, .18, 'triangle', .07, k * .12)),
+  };
+
+  let confettiStop = null;
+  function runConfetti() {
+    const c = $('confetti'), g = c.getContext('2d'); c.width = innerWidth; c.height = innerHeight;
+    const cols = PALETTE.filter(Boolean).map((p) => p.hex);
+    const parts = Array.from({ length: 140 }, () => ({ x: Math.random() * c.width, y: -20 - Math.random() * c.height * .5, vx: (Math.random() - .5) * 3, vy: 2 + Math.random() * 4, r: Math.random() * 3, vr: (Math.random() - .5) * .2, col: cols[Math.floor(Math.random() * cols.length)], w: 10 + Math.random() * 6 }));
+    let alive = true;
+    (function f() { if (!alive) return; g.clearRect(0, 0, c.width, c.height);
+      for (const p of parts) { p.x += p.vx; p.y += p.vy; p.vy += .05; p.r += p.vr; if (p.y > c.height + 20) { p.y = -20; p.vy = 2 + Math.random() * 3; }
+        g.save(); g.translate(p.x, p.y); g.rotate(p.r); g.fillStyle = p.col; g.fillRect(-p.w / 2, -p.w * .35, p.w, p.w * .7); g.restore(); }
+      requestAnimationFrame(f); })();
+    return () => { alive = false; g.clearRect(0, 0, c.width, c.height); };
+  }
+
+  // ---------- Interactions ----------
+  function cellAt(ev) {
+    const r = canvas.getBoundingClientRect();
+    const x = Math.floor(((ev.clientX - r.left) / r.width) * W), y = Math.floor(((ev.clientY - r.top) / r.height) * H);
+    return x >= 0 && y >= 0 && x < W && y < H ? { x, y } : null;
+  }
+  function info() {
+    if (!hover) return;
+    const i = hover.y * W + hover.x, exp = expectedAt(hover.x, hover.y), parts = [];
+    parts.push(grid[i] ? `Brique ${PALETTE[grid[i]].name.toLowerCase()} posée par <b>${owners[i]}</b>` : 'Case vide');
+    parts.push(exp ? `Notice : <b>${PALETTE[exp].name}</b>${grid[i] === exp ? ' ✓ 🔒' : ''}` : 'Zone libre');
+    const r = check(hover.x, hover.y, selected, true);
+    if (r !== 'ok' && r !== 'done') parts.push(`<span style="color:var(--bad)">${REASONS[r]}</span>`);
+    $('hoverInfo').innerHTML = parts.join(' · ');
+  }
+  canvas.addEventListener('pointermove', (ev) => { const c = cellAt(ev); if (c) { hover = c; info(); } });
+  canvas.addEventListener('pointerleave', () => { hover = null; });
+  function pipette(c) {
+    const col = expectedAt(c.x, c.y) || grid[c.y * W + c.x];
+    if (col) { selectColor(col); toast(`Pipette : ${PALETTE[col].name}`); }
+  }
+  let lp = null;
+  canvas.addEventListener('pointerdown', (ev) => {
+    const c = cellAt(ev); if (!c || ev.button !== 0) return;
+    hover = c;
+    if (ev.pointerType === 'touch') lp = { fired: false, t: setTimeout(() => { lp.fired = true; pipette(c); }, 500) };
+  });
+  canvas.addEventListener('pointerup', (ev) => {
+    if (ev.button !== 0) return;
+    if (lp) { clearTimeout(lp.t); const f = lp.fired; lp = null; if (f) return; }
+    const c = cellAt(ev); if (!c) return;
+    const res = place('Vous', c.x, c.y, selected);
+    if (!res.ok) { toast(REASONS[res.reason], true); sfx.bad(); if (res.reason === 'tokens') { $('reserve').classList.remove('flash'); void $('reserve').offsetWidth; $('reserve').classList.add('flash'); } }
+    else res.good ? sfx.good() : sfx.place();
+    info();
+    event(res);
+  });
+  canvas.addEventListener('contextmenu', (ev) => { ev.preventDefault(); const c = cellAt(ev); if (c) pipette(c); });
+  window.addEventListener('keydown', (ev) => { const n = Number(ev.key); if (n >= 1 && n < PALETTE.length) selectColor(n); });
+
+  reset(); renderPalette(); renderStats(); enterStep(0); requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>

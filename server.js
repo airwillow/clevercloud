@@ -71,7 +71,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Fichiers statiques
-  let file = url.pathname === '/' ? '/index.html' : url.pathname;
+  let file = url.pathname === '/' ? '/index.html' : url.pathname === '/tuto' ? '/tuto.html' : url.pathname;
   file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
   const full = path.join(PUBLIC_DIR, file);
   if (!full.startsWith(PUBLIC_DIR)) return json(res, 400, { error: 'bad path' });
