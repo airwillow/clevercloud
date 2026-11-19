@@ -1,24 +1,40 @@
 # 🧱 Brique à Brique
 
-**Un mur de briques collaboratif en temps réel.** Tous les visiteurs construisent le même mur, au même moment, avec un objectif commun : reproduire le modèle de la **notice de montage**.
+Deux jeux de construction en briques, hébergés sur Clever Cloud.
 
-## Le jeu
+## 🧩 Plan de montage (page d'accueil)
+
+**Le casse-tête de construction.** Il faut reproduire un modèle avec un **stock de briques imposé**, en respectant la **gravité**.
+
+- **Le modèle** : chaque case colorée de la notice doit recevoir une brique de la même couleur. Les cases vides restent vides.
+- **Le stock** : il contient des briques 1×1, 1×2, 1×3, 1×4 et des briques hautes 2×2. **Toutes** doivent être utilisées, ni plus ni moins.
+- **La gravité** : une brique tient si **au moins un de ses tenons** repose sur le sol ou sur une autre brique. Les surplombs (tablier d'un pont, chapeau de champignon, bras levés) obligent donc à bien choisir où couper et quelle longueur poser.
+- **Reprendre une brique** : c'est permis, sauf si elle en soutient d'autres. On peut aussi annuler (Ctrl+Z) et recommencer.
+- **L'indice 💡** : il dit si la construction actuelle peut encore aboutir avec les briques restantes (« Impasse ! ») et propose une brique.
+- **Les étoiles** : ★★★ sans indice ni retouche, ★★ sans indice, ★ terminé.
+- **10 niveaux en campagne**, de Facile à Difficile.
+- **Défi du jour** : le même puzzle pour tout le monde, renouvelé chaque jour, avec son classement.
+- **Classements anti-triche** : le serveur **rejoue la partie** envoyée (chaque pose, chaque retrait) avant d'accepter un score.
+
+### Comment les niveaux sont fabriqués
+`src/puzzle.js` contient les règles, un **solveur** (couverture exacte avec contrainte de gravité) et un **générateur**. Pour chaque modèle (`src/levels-data.js`), le générateur essaie des centaines de découpages en briques. Il garde ceux qui ont peu de solutions et peu de 1×1, puis simule un joueur qui pose au hasard pour mesurer la proportion de « pièges ». Le stock retenu est celui qui correspond à la difficulté visée. Pour régénérer : `npm run build:levels`.
+
+## 🧱 Le Mur (`/mur.html`)
+
+Un mur de briques collaboratif en temps réel, en WebSocket : tous les visiteurs reproduisent ensemble une grande mosaïque. Un tutoriel est disponible sur `/tuto.html`.
 
 - Cliquez sur le mur pour poser une brique de la couleur choisie. Tout le monde la voit apparaître instantanément.
-- **Gravité** : une brique doit reposer sur le sol ou sur une autre brique, comme une vraie construction.
-- **Réserve** : 10 briques, +1 par seconde. Chaque brique compte.
-- **Notice de montage** : un modèle de 20 × 16 briques s'affiche en transparence. Chaque brique conforme rapporte **+1 point** et devient **verrouillée 🔒**, donc personne ne peut saboter le travail des autres.
-- **Zone libre** : autour de la notice, chacun construit ce qu'il veut.
-- **Modèle terminé à 100 %** : confettis 🎉, podium des meilleurs bâtisseurs, archivage dans la **galerie**, puis une nouvelle plaque démarre avec la notice suivante (Fusée → Nuage → Robot → Planète → Cœur).
-
-Astuces : touches `1`–`9` pour changer de couleur, **clic droit** (ou appui long sur mobile) = pipette sur la couleur de la notice, `N` pour masquer ou afficher la notice.
+- **Gravité** : une brique doit reposer sur le sol ou sur une autre brique.
+- **Réserve** : 10 briques, +1 par seconde.
+- **Notice de montage** : chaque brique conforme rapporte **+1 point** et devient **verrouillée 🔒**.
+- **Modèle terminé à 100 %** : il rejoint la galerie, puis une nouvelle plaque démarre.
 
 ## Stack
 
 | Brique | Techno |
 |---|---|
 | Serveur | Node.js 20+ (HTTP natif), WebSocket (`ws`) |
-| Persistance | Redis (add-on Clever Cloud) via `ioredis`, sauvegarde à chaque changement (debounce 1 s) |
+| Persistance | Redis (add-on Clever Cloud) via `ioredis` : état du Mur et classements du Plan de montage |
 | Front | HTML/CSS/JS sans framework ni build, rendu Canvas 2D, sons WebAudio générés (aucun fichier) |
 | Hébergement | Clever Cloud (application Node.js + add-on Redis) |
 
@@ -33,7 +49,7 @@ npm start            # http://localhost:8080 (état en mémoire)
 REDIS_URL=redis://localhost:6379 npm start
 ```
 
-Test de bout en bout : des bots construisent une notice complète et vérifient gravité, verrous, points, galerie et plaque suivante.
+Tests de bout en bout. Plan de montage : chaque niveau est soluble, les parties valides sont acceptées et les parties truquées refusées. Mur : des bots construisent une notice complète.
 
 ```bash
 npm test
@@ -87,12 +103,16 @@ Pour montrer la fin d'un modèle au jury sans poser 320 briques :
 ## Structure
 
 ```
-server.js            Serveur HTTP + WebSocket, fichiers statiques, endpoints
-src/game.js          Règles : mur, gravité, verrous, réserve, points, galerie
-src/blueprints.js    Palette et notices de montage (pixel art en ASCII)
-src/store.js         Persistance Redis (ou mémoire)
-public/              Front : index.html, style.css, app.js
-test/smoke.js        Test de bout en bout avec bots WebSocket
+server.js              Serveur HTTP + WebSocket, API, fichiers statiques
+src/puzzle.js          Plan de montage : règles, solveur, générateur (servi aussi au navigateur)
+src/levels-data.js     Modèles des 10 niveaux (pixel art en ASCII)
+src/levels.json        Stocks de briques générés et vérifiés
+src/plan.js            Niveaux, défi du jour, vérification des parties, classements
+src/game.js            Le Mur : gravité, verrous, réserve, points, galerie
+src/blueprints.js      Palette et notices du Mur
+src/store.js           Persistance Redis (ou mémoire)
+public/index.html      Plan de montage (plan.js, plan.css)
+public/mur.html        Le Mur (app.js, style.css) et son tutoriel tuto.html
+scripts/build-levels.js  Génération des niveaux
+test/                  Tests de bout en bout
 ```
-
-Ajouter une notice : une entrée de plus dans `src/blueprints.js`, soit 16 lignes de 20 lettres, une lettre par couleur de la palette.

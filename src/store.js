@@ -37,12 +37,12 @@ export async function createStore() {
 
   return {
     kind: 'redis',
-    async load() {
-      const raw = await client.get(KEY);
+    async load(key = KEY) {
+      const raw = await client.get(key);
       return raw ? JSON.parse(raw) : null;
     },
-    async save(state) {
-      await client.set(KEY, JSON.stringify(state));
+    async save(state, key = KEY) {
+      await client.set(key, JSON.stringify(state));
     },
     async close() {
       await client.quit().catch(() => {});

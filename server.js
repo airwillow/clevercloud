@@ -6,10 +6,13 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Game } from './src/game.js';
 import { createStore } from './src/store.js';
+import * as plan from './src/plan.js';
 
 const PORT = Number(process.env.PORT || 8080);
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
-const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'public');
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = path.join(ROOT, 'public');
+const SCORES_KEY = 'brique-a-brique:plan-scores:v1';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -49,6 +52,36 @@ try {
   console.error('[store] Lecture impossible, nouveau mur :', err.message);
 }
 
+// Classements du Plan de montage
+let scores = new plan.Scores(null);
+try {
+  scores = new plan.Scores(await store.load(SCORES_KEY));
+} catch (err) {
+  console.error('[store] Classements illisibles :', err.message);
+}
+let scoresTimer = null;
+function saveScores() {
+  clearTimeout(scoresTimer);
+  scoresTimer = setTimeout(() => store.save(scores.data, SCORES_KEY).catch((e) => console.error('[store]', e.message)), 500);
+}
+// Pré-calcul du défi du jour (quelques secondes au plus)
+setTimeout(() => { try { plan.daily(); } catch (e) { console.error('[plan] défi du jour :', e.message); } }, 100);
+
+function readBody(req, limit = 64 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) { reject(new Error('too large')); req.destroy(); } else chunks.push(c);
+    });
+    req.on('end', () => {
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); } catch (e) { reject(e); }
+    });
+    req.on('error', reject);
+  });
+}
+
 // ---------- HTTP ----------
 function json(res, code, body) {
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
@@ -61,6 +94,29 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/health') return json(res, 200, { ok: true, store: store.kind, players: onlineCount() });
   if (url.pathname === '/api/state') return json(res, 200, game.snapshot());
 
+  // --- Plan de montage ---
+  if (url.pathname === '/api/plan/levels') return json(res, 200, { palette: plan.palette, levels: plan.campaign() });
+  if (url.pathname === '/api/plan/daily') return json(res, 200, { palette: plan.palette, level: plan.daily(), top: scores.top(`daily-${plan.today()}`) });
+  if (url.pathname === '/api/plan/scores' && req.method === 'GET') {
+    const id = String(url.searchParams.get('level') || '');
+    return json(res, 200, { top: scores.top(id) });
+  }
+  if (url.pathname === '/api/plan/scores' && req.method === 'POST') {
+    let body;
+    try { body = await readBody(req); } catch { return json(res, 400, { error: 'Requête invalide.' }); }
+    const level = plan.findLevel(String(body.level || ''));
+    if (!level) return json(res, 404, { error: 'Niveau inconnu (le défi du jour a peut-être changé).' });
+    const id = String(body.playerId || '');
+    if (!/^[a-zA-Z0-9-]{8,40}$/.test(id)) return json(res, 400, { error: 'Joueur invalide.' });
+    const check = plan.verify(level, body.ops);
+    if (!check.ok) return json(res, 400, { error: check.error });
+    const timeMs = Math.max(Math.round(Number(body.timeMs) || 0), level.pieces.length * 250);
+    const hints = Math.max(0, Math.min(99, Math.round(Number(body.hints) || 0)));
+    const rank = scores.submit(level.id, { id, name: cleanName(body.name), timeMs, moves: check.moves, hints, at: Date.now() });
+    saveScores();
+    return json(res, 200, { ok: true, rank, top: scores.top(level.id) });
+  }
+
   if (url.pathname.startsWith('/api/admin/')) {
     if (!ADMIN_KEY || url.searchParams.get('key') !== ADMIN_KEY) return json(res, 403, { error: 'forbidden' });
     const action = url.pathname.slice('/api/admin/'.length);
@@ -71,7 +127,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Fichiers statiques
-  let file = url.pathname === '/' ? '/index.html' : url.pathname === '/tuto' ? '/tuto.html' : url.pathname;
+  if (url.pathname === '/lib/puzzle.js') {
+    res.writeHead(200, { 'content-type': MIME['.js'], 'cache-control': 'no-cache' });
+    return res.end(await readFile(path.join(ROOT, 'src', 'puzzle.js')));
+  }
+  const ALIASES = { '/': '/index.html', '/tuto': '/tuto.html', '/mur': '/mur.html' };
+  let file = ALIASES[url.pathname] || url.pathname;
   file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
   const full = path.join(PUBLIC_DIR, file);
   if (!full.startsWith(PUBLIC_DIR)) return json(res, 400, { error: 'bad path' });
@@ -176,6 +237,7 @@ async function shutdown() {
   clearTimeout(saveTimer);
   try {
     await store.save(game.state);
+    await store.save(scores.data, SCORES_KEY);
   } catch {}
   await store.close();
   process.exit(0);
