@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Brique à Brique — construisons ensemble</title>
+  <meta name="description" content="Un mur de briques collaboratif en temps réel : reproduisez la notice de montage tous ensemble, une brique à la fois." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><span></span><span></span></div>
+      <div>
+        <h1>Brique à Brique</h1>
+        <p class="tagline">Construisons ensemble, une brique à la fois.</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="chip" id="online" title="Bâtisseurs connectés"><span class="dot"></span><b id="onlineCount">0</b>&nbsp;en ligne</span>
+      <button class="chip chip-btn" id="meBtn" title="Changer de pseudo">👷 <span id="meName">…</span></button>
+      <button class="chip chip-btn" id="soundBtn" title="Son">🔊</button>
+      <button class="chip chip-btn" id="helpBtn" title="Règles">?</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="wall-col">
+      <div class="wall-wrap" id="wallWrap">
+        <canvas id="wall" aria-label="Le mur de briques"></canvas>
+        <div class="conn" id="conn" hidden>Connexion au chantier…</div>
+      </div>
+      <div class="hover-info" id="hoverInfo">Survolez le mur : la zone en pointillés est la notice à reproduire.</div>
+
+      <div class="toolbar">
+        <div class="palette" id="palette" role="radiogroup" aria-label="Couleur de brique"></div>
+        <div class="reserve">
+          <div class="reserve-label"><span>Réserve</span><b id="tokenText">10/10</b></div>
+          <div class="reserve-bar" id="reserveBar"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="card notice">
+        <div class="card-head">
+          <h2>📋 Notice de montage</h2>
+          <span class="plate" id="plateNo">Plaque n°1</span>
+        </div>
+        <div class="notice-body">
+          <canvas id="mini" width="200" height="160" aria-label="Modèle à reproduire"></canvas>
+          <div class="notice-info">
+            <div class="bp-name" id="bpName">…</div>
+            <div class="progress"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="progress-text"><b id="progressPct">0 %</b> · <span id="progressCount">0 / 0</span> briques</div>
+            <label class="toggle"><input type="checkbox" id="ghostToggle" checked /> Afficher la notice sur le mur</label>
+            <div class="upcoming">Ensuite : <span id="upcoming">…</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>🏆 Meilleurs bâtisseurs</h2></div>
+        <ol class="leaderboard" id="leaderboard"><li class="empty">Personne pour l'instant… à vous !</li></ol>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>📡 En direct du chantier</h2></div>
+        <ul class="feed" id="feed"><li class="empty">Le chantier est calme…</li></ul>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>🖼️ Galerie des modèles terminés</h2></div>
+        <div class="gallery" id="gallery"><p class="empty">Aucun modèle terminé. Soyez les premiers !</p></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="foot">
+    Fait avec des briques et du WebSocket · Hébergé sur <a href="https://www.clever.cloud" target="_blank" rel="noopener">Clever Cloud</a>
+  </footer>
+
+  <!-- Accueil / règles -->
+  <dialog id="welcome">
+    <form method="dialog" id="welcomeForm">
+      <h2>Bienvenue sur le chantier 👷</h2>
+      <p>Tous les visiteurs construisent <b>le même mur, en temps réel</b>. Objectif : reproduire ensemble le modèle de la <b>notice de montage</b>.</p>
+      <ul class="rules">
+        <li><span>🧱</span><div>Cliquez sur le mur pour poser une brique de la couleur choisie.</div></li>
+        <li><span>⬇️</span><div><b>Gravité</b> : une brique doit reposer sur le sol ou sur une autre brique.</div></li>
+        <li><span>⏱️</span><div>Votre réserve : <b>10 briques</b>, +1 chaque seconde.</div></li>
+        <li><span>✅</span><div>+1 point par brique conforme à la notice. Elle est alors <b>verrouillée</b> 🔒.</div></li>
+        <li><span>🎨</span><div>Hors de la notice, construisez ce que vous voulez !</div></li>
+        <li><span>🎉</span><div>Modèle terminé à 100 % : il rejoint la galerie et une nouvelle plaque commence.</div></li>
+      </ul>
+      <p class="tips">Astuces : touches <kbd>1</kbd>–<kbd>9</kbd> pour les couleurs, <b>clic droit</b> (ou appui long) = pipette sur la notice.</p>
+      <label class="name-field">Votre pseudo de bâtisseur
+        <input id="nameInput" maxlength="16" autocomplete="nickname" placeholder="ex. Brique-Master" required />
+      </label>
+      <button class="btn-primary" type="submit">Commencer à construire</button>
+    </form>
+  </dialog>
+
+  <!-- Modèle terminé -->
+  <div class="celebrate" id="celebrate" hidden>
+    <canvas id="confetti"></canvas>
+    <div class="celebrate-card">
+      <div class="big">🎉</div>
+      <h2><span id="doneName">Modèle</span> terminé !</h2>
+      <p id="doneStats"></p>
+      <ol class="podium" id="donePodium"></ol>
+      <p class="countdown">Nouvelle plaque dans <b id="doneCountdown">10</b> s</p>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
